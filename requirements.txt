@@ -1,0 +1,4 @@
+twitchAPI
+python-dotenv
+homeassistant-api
+webcolors
