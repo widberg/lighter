@@ -36,6 +36,14 @@ ALLOW_CHANNEL_POINTS = os.getenv("ALLOW_CHANNEL_POINTS").lower() in ("true", "1"
 ALLOW_CHAT = os.getenv("ALLOW_CHAT").lower() in ("true", "1", "t")
 TRANSITION_LENGTH = float(os.getenv("TRANSITION_LENGTH"))
 
+PATTERNS = {
+    "trans": [
+        [91, 206, 250],
+        [245, 169, 184],
+        [255, 255, 255],
+    ],
+}
+
 twitch = None
 chat = None
 light = None
@@ -58,13 +66,26 @@ def get_color_from_input(input: str) -> HTML5SimpleColor:
     input = "".join(input_split)
     if color := get_color_from_string(input):
         return color
-    
+
     for word in input_split:
         if color := get_color_from_string(word):
             return color
-    
+
     input_hash = hash(input)
-    return HTML5SimpleColor(input_hash & 0xFF, (input_hash >> 8) & 0xFF, (input_hash >> 16) & 0xFF)
+    return HTML5SimpleColor(
+        input_hash & 0xFF, (input_hash >> 8) & 0xFF, (input_hash >> 16) & 0xFF
+    )
+
+
+def turn_on_light(color: HTML5SimpleColor, transition=TRANSITION_LENGTH):
+    rgb_color = [color.red, color.green, color.blue]
+    brightness = sum(rgb_color) / 3
+    light.turn_on(
+        entity_id=HOMEASSISTANT_LIGHT_ENTITY,
+        transition=transition,
+        rgb_color=rgb_color,
+        brightness=brightness,
+    )
 
 
 async def on_redemption(data: dict):
@@ -73,9 +94,7 @@ async def on_redemption(data: dict):
     user_input = event.get("user_input")
     try:
         simple_color = get_color_from_input(user_input)
-        await loop.run_in_executor(None, lambda : light.turn_on(
-            entity_id=HOMEASSISTANT_LIGHT_ENTITY, transition=TRANSITION_LENGTH, rgb_color=[simple_color.red, simple_color.green, simple_color.blue]
-        ))
+        await loop.run_in_executor(None, lambda: turn_on_light(simple_color))
         await twitch.update_redemption_status(
             TARGET_CHANNEL, REWARD_ID, id, CustomRewardRedemptionStatus.FULFILLED
         )
@@ -91,9 +110,7 @@ async def on_ready(ready_event: EventData):
 async def on_message(message_event: ChatMessage):
     try:
         simple_color = get_color_from_input(message_event.text)
-        await loop.run_in_executor(None, lambda : light.turn_on(
-            entity_id=HOMEASSISTANT_LIGHT_ENTITY, transition=TRANSITION_LENGTH, rgb_color=[simple_color.red, simple_color.green, simple_color.blue]
-        ))
+        await loop.run_in_executor(None, lambda: turn_on_light(simple_color))
     except Exception:
         return
 
